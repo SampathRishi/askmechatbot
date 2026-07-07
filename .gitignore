@@ -1,0 +1,26 @@
+# secrets
+.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# crawled / generated data (large; regenerate with pipeline.py) — the whole
+# data/ dir is generated (crawl output, vector index, brand, logs, screenshots)
+data/
+
+# generated demo site assets (rebuild with build_demo.py); the hand-written
+# demo-site/chatbot-widget.js and generated index.html are kept
+demo-site/assets/
+
+# node / frontend build
+frontend/node_modules/
+frontend/dist/
+
+# os
+Thumbs.db
+.DS_Store
+
+# Claude Code local session files (machine-specific / ephemeral)
+.claude/
