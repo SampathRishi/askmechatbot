@@ -76,6 +76,51 @@ point it at the Render backend — Vercel is fine for the static front end.
   committed. Rebuild locally (`cd frontend && npm run build`) and commit when the
   UI changes.
 
+## Free hosting: Hugging Face Spaces (~16 GB RAM, no code changes)
+
+Normal free tiers (Render free, Fly free) give only ~512 MB RAM and **OOM** on
+PyTorch. **Hugging Face Spaces' free CPU tier gives ~16 GB RAM**, runs Docker,
+and is the realistic free option. A `Dockerfile` + `.dockerignore` are included.
+
+1. Create a **Docker Space**: https://huggingface.co/new-space → SDK = **Docker**.
+2. Push this project into the Space's git repo. The Space needs the **vector
+   index** too (gitignored here), so include `data/chroma` and `data/brand`:
+   ```bash
+   git clone https://huggingface.co/spaces/<you>/askmechatbot hf-space
+   cd hf-space
+   # copy the app + the runtime index from your project
+   cp -r <project>/* .
+   git lfs install
+   git lfs track "data/chroma/**"        # index files are large -> use LFS
+   cp -r <project>/data/chroma  data/chroma
+   cp -r <project>/data/brand   data/brand
+   git add -A && git commit -m "Deploy chatbot to HF Space" && git push
+   ```
+3. In the Space: **Settings → Variables and secrets → New secret**
+   `ANTHROPIC_API_KEY = <your key>`.
+4. Add this YAML front matter to the top of the Space's `README.md` so it builds
+   as a Docker app on port 7860:
+   ```yaml
+   ---
+   title: Ask Me Chatbot
+   emoji: 💬
+   colorFrom: blue
+   colorTo: indigo
+   sdk: docker
+   app_port: 7860
+   ---
+   ```
+5. The Space builds and serves at `https://<you>-askmechatbot.hf.space`.
+
+Free-tier caveats: the Space is **public** (fine — this is public gov data;
+your API key stays a secret), it **sleeps after inactivity** and cold-starts in
+~10–20 s, and there's no guaranteed persistent disk (the index rides in the
+repo via LFS, which is what the steps above do).
+
+> **Want it free with a smaller footprint?** Do the refactor below (API
+> embeddings + hosted vector DB) and the app fits a 512 MB free tier without
+> PyTorch — but that's code changes + external services.
+
 ## Fully-serverless alternative (more work)
 To run on Vercel/serverless you'd refactor the heavy local pieces out:
 - swap `bge-small` for an **embeddings API** (Voyage/OpenAI/Cohere) in

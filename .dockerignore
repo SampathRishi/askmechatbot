@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.git/
+.claude/
+frontend/node_modules/
+node_modules/
+# generated data is large; the vector index is added separately (see DEPLOY.md).
+# Keep data/chroma + data/brand if you want to bake the index into the image.
+data/raw/
+data/processed/
+data/*.log
+data/*.png
+Cameron County Homepage - Cameron County_files/
+demo-site/assets/
+*.md
