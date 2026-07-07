@@ -51,7 +51,10 @@ def _env_bool(name: str, default: bool) -> bool:
 # --------------------------------------------------------------------------- #
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_DIR = PROJECT_ROOT / "data"
+# DATA_DIR holds all generated artifacts (crawl output, vector index, brand).
+# Override with the DATA_DIR env var to point at a mounted persistent disk when
+# deploying (e.g. DATA_DIR=/var/data on Render) so the index survives restarts.
+DATA_DIR = Path(_env_str("DATA_DIR", str(PROJECT_ROOT / "data")))
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 CHROMA_DIR = DATA_DIR / "chroma"

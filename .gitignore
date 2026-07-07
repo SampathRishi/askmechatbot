@@ -16,7 +16,9 @@ demo-site/assets/
 
 # node / frontend build
 frontend/node_modules/
-frontend/dist/
+# NOTE: frontend/dist/ is intentionally COMMITTED so the deployed backend can
+# serve the built React UI without a Node build step on the host. Rebuild it
+# with `cd frontend && npm run build` and commit the result when the UI changes.
 
 # os
 Thumbs.db
