@@ -10,9 +10,10 @@ __pycache__/
 # data/ dir is generated (crawl output, vector index, brand, logs, screenshots)
 data/
 
-# generated demo site assets (rebuild with build_demo.py); the hand-written
-# demo-site/chatbot-widget.js and generated index.html are kept
-demo-site/assets/
+# demo-site/ (index.html, chatbot-widget.js, and assets/) is committed so the
+# deployed server can serve the offline homepage replica — the Render build only
+# runs `pip install`, it does not regenerate assets. Rebuild locally with
+# build_demo.py when the source homepage changes, then commit the result.
 
 # node / frontend build
 frontend/node_modules/
