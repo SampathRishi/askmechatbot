@@ -3,7 +3,7 @@
 #
 # Deploy: push this repo to GitHub, then in Render: New + -> Blueprint -> pick
 # this repo. Render reads this file. See DEPLOY.md for the full walkthrough,
-# including how to get the 543 MB vector index onto the persistent disk.
+# including how to get the ~244 MB vector index onto the persistent disk.
 services:
   - type: web
     name: askmechatbot
@@ -24,7 +24,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.11.9"
     # Persistent disk so the vector index survives restarts/redeploys.
-    # Only data/chroma (+ data/brand) are needed at runtime (~200 MB), so 1 GB
+    # Only data/chroma (+ data/brand) are needed at runtime (~244 MB), so 1 GB
     # is plenty. Raise if you re-crawl on the server (raw/processed also land here).
     disk:
       name: chroma-data

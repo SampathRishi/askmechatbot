@@ -15,7 +15,7 @@ publishes both at `https://<your-service>/` and `https://<your-service>/demo/`.
 
 It needs a host that can
 run a **persistent Python server with real RAM and a disk** — because it loads a
-local embedding model (PyTorch / `bge-small`) and reads a **~200 MB ChromaDB
+local embedding model (PyTorch / `bge-small`) and reads a **~244 MB ChromaDB
 vector index** from disk.
 
 > **Why not Vercel?** Vercel runs short-lived serverless functions capped at
@@ -71,6 +71,47 @@ After either, **Manual Deploy → Restart** so the server picks up the index.
 
 ---
 
+## Custom domain (share a clean URL for demos)
+
+Render serves the app at `https://<service>.onrender.com` out of the box. To put
+it on your own domain (e.g. **`demo.yourdomain.com`**) with a free auto-renewing
+TLS certificate:
+
+### 1. Add the domain in Render
+Service → **Settings → Custom Domains → Add Custom Domain** → enter the exact
+hostname you want, e.g. `demo.yourdomain.com`. Render shows the DNS record you
+must create and then waits for it to resolve.
+
+### 2. Point DNS at Render (at your registrar / DNS host)
+Use whichever matches the hostname you added:
+
+| Hostname you want                | DNS record to add                                             |
+| -------------------------------- | ------------------------------------------------------------ |
+| **Subdomain** `demo.yourdomain.com` (recommended) | **CNAME** `demo` → `<service>.onrender.com` |
+| **Apex / root** `yourdomain.com` | **ALIAS**/**ANAME** → `<service>.onrender.com`, or the **A** records Render lists (some registrars can't CNAME an apex) |
+
+> Prefer a **subdomain** (`demo.` / `chat.` / `assistant.`) — it's a simple CNAME
+> that works at every registrar and keeps your root domain free for other use.
+
+### 3. Wait for verification + TLS
+DNS propagation is usually minutes (can be up to ~a few hours). Render detects
+the record, marks the domain **Verified**, and auto-issues a **Let's Encrypt**
+certificate — no action needed. The status flips to a green check when it's live.
+
+### 4. Verify + point the widget at it
+- Open `https://demo.yourdomain.com/demo/` → the demo + chatbot on your domain.
+- If you embed the widget on a **third-party** site, update `iframeUrl` (and the
+  embed `src`) to the custom domain:
+  ```js
+  iframeUrl: "https://demo.yourdomain.com",
+  ```
+
+**No app changes needed** — the server is host-agnostic and CORS is already
+permissive, so the same service answers on both the `onrender.com` URL and your
+custom domain simultaneously.
+
+---
+
 ## Using the embeddable widget on another site
 The demo widget in [`demo-site/chatbot-widget.js`](demo-site/chatbot-widget.js)
 iframes the assistant. Its default `iframeUrl` is `"/"` (same origin), which is
@@ -93,7 +134,7 @@ and point it at the Render backend — Vercel is fine for the static front end.
 ## Cost & sizing notes
 - The backend needs **≥ 2 GB RAM** (PyTorch + Chroma). Render **Standard**
   (~$25/mo) fits; the free/512 MB tiers OOM.
-- The disk only needs ~200 MB (the Chroma index); 1 GB in the blueprint is ample.
+- The disk only needs ~244 MB (the Chroma index); 1 GB in the blueprint is ample.
 - Rebuilding the frontend is **not** required on the host — `frontend/dist` is
   committed. Rebuild locally (`cd frontend && npm run build`) and commit when the
   UI changes.

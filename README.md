@@ -257,5 +257,5 @@ data/                generated artifacts (gitignored)
   `data/raw/crawl_report.json` so you can decide whether to add any to
   `ALLOWLIST_DOMAINS`.
 - **OneDrive:** this project sits under a OneDrive-synced folder. The `data/`
-  directory (crawl output + 175 MB vector index) will sync unless excluded;
+  directory (crawl output + 244 MB vector index) will sync unless excluded;
   consider pausing OneDrive during large crawls.
