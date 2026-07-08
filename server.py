@@ -167,6 +167,18 @@ def reset(req: ResetRequest) -> JSONResponse:
 
 
 # --------------------------------------------------------------------------- #
+# Demo site (offline county-homepage replica + embedded chat widget).
+# Mounted at /demo so one server hosts both the demo page and the chatbot; the
+# widget iframes "/" (this same origin), which serves the chat UI below.
+# Must be mounted BEFORE the "/" catch-all so it isn't shadowed.
+# --------------------------------------------------------------------------- #
+
+_DEMO_SITE = config.PROJECT_ROOT / "demo-site"
+if _DEMO_SITE.is_dir():
+    app.mount("/demo", StaticFiles(directory=str(_DEMO_SITE), html=True), name="demo")
+
+
+# --------------------------------------------------------------------------- #
 # Static frontend (built React app). Mounted LAST so it doesn't shadow the API.
 # --------------------------------------------------------------------------- #
 

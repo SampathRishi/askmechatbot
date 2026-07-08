@@ -1,7 +1,19 @@
 # Deploying the Cameron County RAG chatbot
 
-This app is **one FastAPI service** that serves both the chat API and the built
-React UI (`server.py` mounts `frontend/dist` at `/`). It needs a host that can
+This app is **one FastAPI service** that serves everything together:
+
+| Path        | Serves                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| `/`         | the built React chat UI (`frontend/dist`)                         |
+| `/demo/`    | the offline county-homepage replica with the embedded chat widget |
+| `/chat`, `/health`, `/brand` | the RAG API                                     |
+
+`server.py` mounts `demo-site/` at `/demo` (before the `/` catch-all) so the demo
+page and the chatbot are hosted by the **same server on one origin** — the widget
+in the demo iframes `/`, which is the chat UI. Deploying the service therefore
+publishes both at `https://<your-service>/` and `https://<your-service>/demo/`.
+
+It needs a host that can
 run a **persistent Python server with real RAM and a disk** — because it loads a
 local embedding model (PyTorch / `bge-small`) and reads a **~200 MB ChromaDB
 vector index** from disk.
@@ -54,17 +66,27 @@ After either, **Manual Deploy → Restart** so the server picks up the index.
 ### 5. Verify
 - `https://<your-service>.onrender.com/health` → `{"status":"ok","indexed_chunks":11705,...}`
 - Open the root URL → the branded chat UI. Ask a question.
+- Open `.../demo/` → the county homepage replica with the chat launcher
+  (bottom-right); it iframes the same-origin chat UI.
 
 ---
 
 ## Using the embeddable widget on another site
 The demo widget in [`demo-site/chatbot-widget.js`](demo-site/chatbot-widget.js)
-iframes the assistant. Set `iframeUrl` to your deployed URL:
+iframes the assistant. Its default `iframeUrl` is `"/"` (same origin), which is
+correct when the widget is served by this app at `/demo/`.
+
+To embed the chatbot on a **different** domain (a real customer site), copy the
+one-line embed and set `iframeUrl` to the **full** deployed URL so `/` doesn't
+resolve to the customer's own origin:
 ```js
 iframeUrl: "https://<your-service>.onrender.com",
 ```
-You can host `demo-site/` (or `frontend/`) as a **static site on Vercel** and
-point it at the Render backend — Vercel is fine for the static front end.
+```html
+<script src="https://<your-service>.onrender.com/demo/chatbot-widget.js"></script>
+```
+You can also host `demo-site/` (or `frontend/`) as a **static site on Vercel**
+and point it at the Render backend — Vercel is fine for the static front end.
 
 ---
 

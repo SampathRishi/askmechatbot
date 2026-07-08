@@ -7,7 +7,11 @@
  * point it at your hosted chatbot (e.g. the local RAG UI: http://127.0.0.1:8000).
  * ==========================================================================*/
 const CHATBOT_CONFIG = {
-  iframeUrl: "http://127.0.0.1:8000",         // Cameron County RAG assistant (server.py)
+  // Same-origin root: the chatbot UI is served by the same server that serves
+  // this demo page (server.py mounts the demo at /demo and the chat UI at /),
+  // so "/" works identically in local dev and in production. Override with a
+  // full URL (e.g. "https://your-service.onrender.com") to point at a remote backend.
+  iframeUrl: "/",                             // Cameron County RAG assistant (server.py)
   buttonColor: "#033f88",                     // Cameron County blue
   title: "Cameron County Assistant",
   width: 500,                                 // chat panel width (px)
