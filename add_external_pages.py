@@ -76,6 +76,8 @@ class Seed:
     max_pages: int
     force_browser: bool = False  # skip httpx, always render (for WAF hosts)
     fallback_text: str = ""      # curated chunk to index if crawling yields none
+    always_add_fallback: bool = False  # also index fallback_text even if crawl succeeds
+                                       # (for hosts whose own pages lack county signal)
 
 
 # A factual, non-fabricated description used only when a seed's own content
@@ -144,6 +146,13 @@ _F = {
         "https://websvr.co.cameron.tx.us/main.asp?id=faq, linked as 'Jury Duty' "
         "on the Cameron County homepage."
     ),
+    "idocket": (
+        "Cameron County court case lookup and tracking. Cameron County links to "
+        "the iDocket portal at https://idocket.com/ under its JUSTICE menu for "
+        "searching and tracking court cases. iDocket lets registered users look up "
+        "trial court case information — including Cameron County courts — by "
+        "plaintiff or defendant name, file date, or case number."
+    ),
 }
 
 # Approved external services (their host must pass the allowlist). Portals try a
@@ -157,8 +166,12 @@ SEEDS: List[Seed] = [
     Seed("Extension Office (Texas A&M AgriLife, Cameron County)",
          "https://cameron.agrilife.org/", max_pages=10,
          force_browser=True, fallback_text=AGRILIFE_FALLBACK),
-    Seed("iDocket — court case tracking portal",
-         "https://idocket.com/homepage2.htm", max_pages=3),
+    # iDocket's own pages are generic marketing (no Cameron County signal), so a
+    # plain crawl doesn't rank for county case-lookup queries. Always index the
+    # curated hand-off description below so the assistant surfaces the portal.
+    Seed("Court Case Search / Tracking (iDocket)",
+         "https://idocket.com/", max_pages=1,
+         fallback_text=_F["idocket"], always_add_fallback=True),
     Seed("Job Opportunities (ApplicantPool)",
          "https://cameroncountytx.applicantpool.com/jobs/", max_pages=3,
          fallback_text=_F["jobs"]),
@@ -438,6 +451,13 @@ def main() -> None:
                 seed_chunks = [_fallback_chunk(seed)]
                 print(f"[ext] {seed.label}: crawl blocked/empty — using curated "
                       f"fallback description chunk.")
+            elif seed.always_add_fallback and seed.fallback_text:
+                # crawl succeeded but the host's own pages lack county signal;
+                # add the curated hand-off description alongside so the portal
+                # surfaces for county-scoped queries.
+                seed_chunks.append(_fallback_chunk(seed))
+                print(f"[ext] {seed.label}: also adding curated hand-off "
+                      f"description chunk.")
             per_seed[seed.label] = (len(pages), len(seed_chunks))
             all_chunks.extend(seed_chunks)
     finally:

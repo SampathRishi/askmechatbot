@@ -18,12 +18,18 @@ from __future__ import annotations
 import json
 import re
 import sys
-from typing import Dict, List
+from typing import Dict, List, Optional, Set, Tuple
 
 import chromadb
 
 import config
 from embeddings import get_embedder
+
+try:
+    from rapidfuzz import fuzz, process as rf_process
+except ImportError:  # fuzzy search degrades gracefully if rapidfuzz is absent
+    fuzz = None
+    rf_process = None
 
 
 # Common English stopwords to ignore when computing keyword overlap.
@@ -59,6 +65,81 @@ def _keyword_boost(terms: List[str], heading: str, text: str) -> float:
             hits += 0.5            # body match: half weight
     frac = min(1.0, hits / len(set(terms)))
     return config.KEYWORD_BOOST_WEIGHT * frac
+
+
+# --------------------------------------------------------------------------- #
+# Fuzzy (typo-tolerant) vocabulary
+# --------------------------------------------------------------------------- #
+
+def _vocab_terms_from_chunk(chunk: dict) -> List[str]:
+    hp = chunk.get("heading_path") or ""
+    body = chunk.get("text") or ""
+    words = re.findall(r"[a-z][a-z0-9]{2,}", f"{hp}\n{body}".lower())
+    return [w for w in words if w not in _STOPWORDS]
+
+
+def build_vocab(chunks: List[dict]) -> int:
+    """Write config.VOCAB_JSON: the set of distinctive corpus terms used to
+    correct typo'd query words at search time. Terms seen fewer than
+    FUZZY_VOCAB_MIN_COUNT times are dropped so OCR/scan noise doesn't become a
+    'correction' target."""
+    from collections import Counter
+    counts: Counter = Counter()
+    for c in chunks:
+        counts.update(set(_vocab_terms_from_chunk(c)))  # count each term once/chunk
+    vocab = sorted(t for t, n in counts.items()
+                   if n >= config.FUZZY_VOCAB_MIN_COUNT and len(t) >= 3)
+    config.VOCAB_JSON.parent.mkdir(parents=True, exist_ok=True)
+    config.VOCAB_JSON.write_text(json.dumps(vocab), encoding="utf-8")
+    print(f"[index] wrote fuzzy vocab: {len(vocab)} terms -> {config.VOCAB_JSON}")
+    return len(vocab)
+
+
+_VOCAB_CACHE: Optional[Tuple[Set[str], List[str]]] = None
+
+
+def _load_vocab() -> Tuple[Set[str], List[str]]:
+    """(set, list) of vocab terms, cached for the process. Empty if no vocab
+    file exists yet (fuzzy search then simply no-ops)."""
+    global _VOCAB_CACHE
+    if _VOCAB_CACHE is None:
+        try:
+            terms = json.loads(config.VOCAB_JSON.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001 - missing/corrupt vocab -> fuzzy disabled
+            terms = []
+        _VOCAB_CACHE = (set(terms), list(terms))
+    return _VOCAB_CACHE
+
+
+def _fuzzy_corrections(terms: List[str]) -> List[str]:
+    """For each query term that is NOT already a corpus term (i.e. a likely
+    misspelling such as 'comissioner' or 'sherif'), return the closest real
+    vocabulary terms by edit-distance ratio. Purely additive: corrections widen
+    the lexical + keyword-boost branches; they never rewrite the user's query or
+    the dense query vector, so the relevance gate stays calibrated."""
+    if not (config.FUZZY_SEARCH_ENABLED and rf_process is not None):
+        return []
+    vocab_set, vocab_list = _load_vocab()
+    if not vocab_list:
+        return []
+    corrections: List[str] = []
+    typo_terms = 0
+    for t in terms:
+        if len(t) < config.FUZZY_MIN_TERM_LEN or t in vocab_set:
+            continue  # too short to fuzz, or already an exact corpus term
+        if typo_terms >= config.FUZZY_MAX_TERMS:
+            break
+        matches = rf_process.extract(
+            t, vocab_list, scorer=fuzz.ratio,
+            limit=config.FUZZY_MAX_MATCHES_PER_TERM,
+            score_cutoff=config.FUZZY_MIN_SCORE,
+        )
+        if matches:
+            typo_terms += 1
+            for term, _score, _idx in matches:
+                if term not in corrections and term not in terms:
+                    corrections.append(term)
+    return corrections
 
 
 # --------------------------------------------------------------------------- #
@@ -135,6 +216,9 @@ def build_index() -> int:
 
     print(f"\n[index] done. collection '{config.CHROMA_COLLECTION}' "
           f"count={collection.count()}")
+
+    # write the fuzzy-search vocabulary alongside the index so it ships with it
+    build_vocab(chunks)
     return total
 
 
@@ -178,6 +262,12 @@ def search(query: str, k: int = config.RETRIEVAL_TOP_K) -> List[Dict]:
     pool = max(k, config.RETRIEVAL_CANDIDATE_POOL)
     terms = _query_terms(query)
 
+    # Fuzzy branch: map any typo'd query term to the closest real corpus term(s)
+    # so misspelled names ("sherif", "comissioner") still hit the lexical branch
+    # and keyword boost. `boost_terms` = user's terms + corrections.
+    fuzzy = _fuzzy_corrections(terms)
+    boost_terms = terms + fuzzy
+
     # merge candidates by chunk id so dense + lexical hits don't double-count
     merged: Dict[str, Dict] = {}
 
@@ -204,8 +294,9 @@ def search(query: str, k: int = config.RETRIEVAL_TOP_K) -> List[Dict]:
     # the answer may capitalize them (e.g. a heading-style chunk "District
     # Courts"). Try a few case variants per term so title/sentence-case chunks
     # are still rescued. Purely additive — it only widens the candidate set.
+    # exact query terms first, then fuzzy corrections (each still additive).
     seen_variants: set = set()
-    for term in terms[:6]:
+    for term in (terms + fuzzy)[:8]:
         for variant in (term, term.capitalize(), term.upper()):
             if variant in seen_variants:
                 continue
@@ -222,7 +313,7 @@ def search(query: str, k: int = config.RETRIEVAL_TOP_K) -> List[Dict]:
 
     candidates: List[Dict] = []
     for c in merged.values():
-        boost = _keyword_boost(terms, c.get("heading_path", ""), c["text"])
+        boost = _keyword_boost(boost_terms, c.get("heading_path", ""), c["text"])
         c["rerank_score"] = round(c["score"] + boost, 4)
         candidates.append(c)
 

@@ -64,6 +64,9 @@ PAGES_JSONL = RAW_DIR / "pages.jsonl"
 FAILED_URLS_TXT = RAW_DIR / "failed_urls.txt"
 CHUNKS_JSONL = PROCESSED_DIR / "chunks.jsonl"
 CRAWL_REPORT_JSON = RAW_DIR / "crawl_report.json"
+# Corpus vocabulary for fuzzy (typo-tolerant) search, written at index build time
+# and read at query time. Lives next to the index so it ships with it on deploy.
+VOCAB_JSON = CHROMA_DIR / "vocab.json"
 BRAND_JSON = BRAND_DIR / "brand.json"
 
 for _d in (RAW_DIR, PROCESSED_DIR, CHROMA_DIR, BRAND_DIR):
@@ -259,6 +262,19 @@ KEYWORD_BOOST_WEIGHT = _env_float("KEYWORD_BOOST_WEIGHT", 0.20)
 # RETRIEVAL_CANDIDATE_POOL never reaches. Purely additive: it can only widen the
 # candidate set before re-ranking, never displace a better dense hit.
 LEXICAL_MATCHES_PER_TERM = _env_int("LEXICAL_MATCHES_PER_TERM", 5)
+
+# Fuzzy (typo-tolerant) branch: for a distinctive query term that is NOT in the
+# corpus vocabulary (i.e. likely a misspelling like "comissioner" or "sherif"),
+# find the closest real vocabulary terms via edit distance and add them to the
+# lexical branch + keyword boost. Purely additive, like the lexical branch: it
+# only rescues typo'd proper nouns, never displaces a better exact/dense hit.
+# The vocabulary is written next to the index at build time (vocab.json).
+FUZZY_SEARCH_ENABLED = _env_bool("FUZZY_SEARCH_ENABLED", True)
+FUZZY_MIN_SCORE = _env_int("FUZZY_MIN_SCORE", 82)          # rapidfuzz ratio 0-100
+FUZZY_MAX_MATCHES_PER_TERM = _env_int("FUZZY_MAX_MATCHES_PER_TERM", 3)
+FUZZY_MAX_TERMS = _env_int("FUZZY_MAX_TERMS", 4)            # cap typo'd terms/query
+FUZZY_MIN_TERM_LEN = _env_int("FUZZY_MIN_TERM_LEN", 4)      # don't fuzz very short terms
+FUZZY_VOCAB_MIN_COUNT = _env_int("FUZZY_VOCAB_MIN_COUNT", 2)  # ignore hapax noise in vocab
 
 # Relevance gate: if the best cosine similarity is below this, we do NOT call the
 # LLM and return the not-available message. Tuned for bge-small (0.35 start).

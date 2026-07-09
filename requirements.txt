@@ -20,3 +20,4 @@ uvicorn[standard]>=0.30
 # --- utilities ---
 tenacity>=8.5             # retry/backoff at network boundaries
 python-dotenv>=1.0        # load ANTHROPIC_API_KEY from a .env file
+rapidfuzz>=3.9            # fuzzy (typo-tolerant) term matching in search
